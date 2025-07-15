@@ -1,0 +1,39 @@
+---
+- name: Install Wazuh Agent on Ubuntu/Debian nodes
+  hosts: ubuntu_nodes
+  become: yes
+  vars:
+    # Set the IP address of your Wazuh Manager here
+    wazuh_manager_ip: "YOUR_WAZUH_MANAGER_IP"
+
+  tasks:
+    - name: Get system architecture
+      ansible.builtin.command: uname -m
+      register: arch_result
+
+    - name: Set architecture fact
+      ansible.builtin.set_fact:
+        arch: "{{ 'amd64' if arch_result.stdout == 'x86_64' else 'arm64' }}"
+
+    - name: Download Wazuh agent .deb package
+      ansible.builtin.get_url:
+        url: "https://packages.wazuh.com/4.x/apt/pool/main/w/wazuh-agent/wazuh-agent_4.12.0-1_{{ arch }}.deb"
+        dest: /tmp/wazuh-agent.deb
+
+    - name: Install Wazuh agent package
+      ansible.builtin.command: dpkg -i /tmp/wazuh-agent.deb
+      environment:
+        WAZUH_MANAGER: "{{ wazuh_manager_ip }}"
+
+    - name: Enable and start wazuh-agent service
+      ansible.builtin.systemd:
+        name: wazuh-agent
+        enabled: yes
+        state: started
+      when: ansible_service_mgr == "systemd"
+
+    - name: Check wazuh-agent service status
+      ansible.builtin.shell: systemctl is-active wazuh-agent
+      register: wazuh_status
+      changed_when: false
+      failed_when: "'active' not in wazuh_status.stdout"

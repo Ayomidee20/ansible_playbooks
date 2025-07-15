@@ -1,0 +1,39 @@
+---
+- name: Install Wazuh Agent on Amazon Linux / RPM nodes
+  hosts: centos_nodes
+  become: yes
+  vars:
+    # Set your Wazuh Manager IP address or hostname here
+    wazuh_manager_ip: "YOUR_WAZUH_MANAGER_IP"
+
+  tasks:
+    - name: Get system architecture
+      ansible.builtin.command: uname -m
+      register: arch_result
+
+    - name: Set RPM architecture fact
+      ansible.builtin.set_fact:
+        rpm_arch: "{{ 'x86_64' if arch_result.stdout == 'x86_64' else 'aarch64' }}"
+
+    - name: Download Wazuh agent RPM package
+      ansible.builtin.get_url:
+        url: "https://packages.wazuh.com/4.x/yum/wazuh-agent-4.12.0-1.{{ rpm_arch }}.rpm"
+        dest: /tmp/wazuh-agent.rpm
+
+    - name: Install Wazuh agent
+      ansible.builtin.command: >
+        rpm -ihv /tmp/wazuh-agent.rpm
+      environment:
+        WAZUH_MANAGER: "{{ wazuh_manager_ip }}"
+
+    - name: Enable and start wazuh-agent service (Systemd)
+      ansible.builtin.systemd:
+        name: wazuh-agent
+        enabled: yes
+        state: started
+      when: ansible_service_mgr == "systemd"
+
+    - name: Ensure wazuh-agent is running (fallback for other service managers)
+      ansible.builtin.service:
+        name: wazuh-agent
+        state: started
