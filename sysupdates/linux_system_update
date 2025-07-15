@@ -1,0 +1,25 @@
+---
+# maintenance/system_update_reboot.yml
+- name: Perform system update and reboot if necessary
+  hosts: linux_nodes
+  become: yes
+  tasks:
+    - name: Update all packages
+      apt:
+        upgrade: dist
+        update_cache: yes
+
+    - name: Check if a reboot is required
+      stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+    - name: Reboot system if required
+      reboot:
+      when: reboot_required.stat.exists
+
+    - name: Log update timestamp
+      lineinfile:
+        path: /var/log/update.log
+        line: "System updated on {{ ansible_date_time.date }} at {{ ansible_date_time.time }}"
+        create: yes
